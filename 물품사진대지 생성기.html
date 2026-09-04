@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>물품사진대지 • A4</title>
+  <style>
+    :root {
+      --page-w: 210mm;
+      --page-h: 297mm;
+      --page-pad: 16mm;
+      --accent: #0b6cff;
+      --ink: #1f2937;
+      --muted: #6b7280;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #eef1f6;
+      color: var(--ink);
+      font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+    }
+
+    /* ── Global toolbar ── */
+    .g-toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; gap: 8px; flex-wrap: wrap;
+      padding: 10px 16px;
+      background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #d1d5db;
+      justify-content: center;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      border: 1px solid #cbd5e1; background: #fff; color: #111827;
+      padding: 7px 14px; border-radius: 9px; cursor: pointer;
+      font-weight: 600; font-size: 13px;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) { background: #f1f5f9; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover:not(:disabled) { background: #0755d0; }
+    .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.danger { color: #ef4444; border-color: #fca5a5; }
+    .btn.danger:hover:not(:disabled) { background: #fef2f2; }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── Sheet container ── */
+    #sheetsContainer { padding-bottom: 48px; }
+
+    .sheet-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    /* ── Per-sheet toolbar ── */
+    .s-toolbar {
+      display: flex; align-items: center; gap: 6px;
+      width: var(--page-w);
+      padding: 6px 10px;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+    }
+    .s-toolbar .page-label {
+      font-size: 12px; font-weight: 700; color: var(--muted);
+      margin-right: 4px;
+    }
+    .s-toolbar .spacer { flex: 1; }
+    .s-toolbar .btn { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+
+    /* ── A4 sheet ── */
+    .sheet {
+      width: var(--page-w); height: var(--page-h);
+      background: #fff;
+      box-shadow: 0 6px 24px rgba(0,0,0,.1);
+      border: 1px solid #d1d5db;
+      border-radius: 0 0 10px 10px;
+      padding: var(--page-pad);
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .doc-header { text-align: center; flex-shrink: 0; }
+    .doc-title { font-size: 22pt; font-weight: 800; color: var(--accent); letter-spacing: 1px; }
+
+    .meta-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-top: 10px;
+    }
+    .meta-cell {
+      border: 1px solid #dbe2ec; border-radius: 8px;
+      padding: 5px 12px; background: #f8fafc;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 10.5pt;
+    }
+    .meta-cell .lbl { color: var(--muted); font-weight: 700; white-space: nowrap; }
+    .meta-cell .val { outline: none; flex: 1; min-width: 0; }
+    .meta-cell input[type="date"] {
+      border: none; outline: none; background: transparent;
+      font-family: inherit; font-size: 10.5pt; color: var(--ink);
+      flex: 1; cursor: pointer; padding: 0; min-width: 0;
+    }
+    .meta-cell input[type="date"]::-webkit-calendar-picker-indicator {
+      cursor: pointer; opacity: .5;
+    }
+
+    /* ── Body ── */
+    .sheet-body {
+      flex: 1; display: flex; flex-direction: column;
+      min-height: 0; margin-top: 10px;
+    }
+
+    .item-field {
+      flex-shrink: 0;
+      border: 2px solid var(--accent); border-radius: 10px;
+      padding: 8px 14px; background: #f8fbff;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12pt;
+    }
+    .item-field .lbl { font-weight: 700; color: var(--accent); white-space: nowrap; }
+    .item-field .val { outline: none; flex: 1; }
+
+    /* ── Photo area ── */
+    .photo-area {
+      flex: 1; min-height: 0;
+      margin-top: 10px;
+      display: flex; flex-direction: column;
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-auto-rows: 1fr;
+      gap: 10px;
+      height: 100%;
+      overflow: hidden;
+    }
+    .photo-grid[data-layout="1"] { grid-template-columns: 1fr; }
+    .photo-grid[data-layout="2"] { grid-template-columns: 1fr; }
+    .photo-grid[data-layout="4"] { grid-template-columns: repeat(2, 1fr); }
+
+    /* ── Photo box ── */
+    .photo-box {
+      position: relative;
+      border: 2px dashed #b6c3d7; border-radius: 12px;
+      background: #f9fbfe;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; cursor: pointer;
+      transition: border-color .2s;
+      min-height: 0;
+    }
+    .photo-box:hover { border-color: var(--accent); }
+    .photo-box.drag-over { border-color: #f59e0b !important; background: #fffbeb; }
+
+    .photo-box img {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      border-radius: 6px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .photo-ph {
+      color: #94a3b8; text-align: center; font-size: 12px;
+      padding: 16px; pointer-events: none; user-select: none;
+      line-height: 1.7;
+    }
+
+    /* ── Overlay controls ── */
+    .photo-ctl {
+      position: absolute; top: 7px; right: 7px;
+      display: flex; gap: 4px;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+      z-index: 2;
+    }
+    .photo-box:hover .photo-ctl.on {
+      opacity: 1; pointer-events: all;
+    }
+    .ctl-btn {
+      width: 27px; height: 27px; border-radius: 6px;
+      border: none; cursor: pointer; font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; line-height: 1;
+    }
+    .ctl-btn.b-del { background: #ef4444; color: #fff; }
+    .ctl-btn.b-rep { background: #3b82f6; color: #fff; }
+    .ctl-btn.b-rot { background: #8b5cf6; color: #fff; }
+    .ctl-btn:hover { filter: brightness(1.12); }
+
+    /* ── Print ── */
+    @page { size: A4; margin: 0; }
+    @media print {
+      body { background: #fff; }
+      .g-toolbar, .s-toolbar { display: none; }
+      #sheetsContainer { padding-bottom: 0; }
+      .sheet-wrap { margin: 0; }
+      .sheet { box-shadow: none; border: none; border-radius: 0; }
+      .sheet-wrap:not(:last-child) .sheet {
+        break-after: page;
+        page-break-after: always;
+      }
+      .photo-ctl { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="g-toolbar">
+  <button class="btn primary" id="btnPDF">PDF로 저장하기</button>
+  <button class="btn" id="btnAddSheet">+ 페이지 추가</button>
+</div>
+
+<div id="sheetsContainer"></div>
+
+<script>
+'use strict';
+
+const todayStr = new Date().toISOString().split('T')[0];
+let sheetCount = 0;
+let dragSrc    = null;
+
+/* ── Auto-save (부서·작성자·연락처) ── */
+function initAutoSave(root) {
+  root.querySelectorAll('.val[contenteditable][data-key]').forEach(el => {
+    const key   = 'ps_' + el.dataset.key;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) el.textContent = saved;
+    el.addEventListener('input', () =>
+      localStorage.setItem(key, el.textContent.trim())
+    );
+  });
+}
+
+/* ── Image helpers ── */
+function showImage(box, src, rotation) {
+  rotation = rotation ?? 0;
+  const img = box.querySelector('img');
+  img.style.cssText = '';          /* clear inline overrides */
+  img.dataset.rotation = rotation;
+  img.onload = () => fitImage(box);
+  img.src = src;
+  img.style.display = 'block';
+  box.querySelector('.photo-ph').style.display  = 'none';
+  box.querySelector('.photo-ctl').classList.add('on');
+}
+
+function clearImage(box) {
+  const img = box.querySelector('img');
+  img.src   = '';
+  img.style.cssText  = '';        /* let CSS restore display:none + transform */
+  img.dataset.rotation = 0;
+  box.querySelector('.photo-ph').style.display  = '';
+  box.querySelector('.photo-ctl').classList.remove('on');
+}
+
+function fitImage(box) {
+  const img = box.querySelector('img');
+  const rot = parseInt(img.dataset.rotation || 0);
+  const swapped = rot % 180 !== 0;
+  const pw = box.clientWidth  - 24;
+  const ph = box.clientHeight - 24;
+  // 회전 후 실제 눈에 보이는 유효 치수
+  const ew = swapped ? img.naturalHeight : img.naturalWidth;
+  const eh = swapped ? img.naturalWidth  : img.naturalHeight;
+  const scale = ew / eh > pw / ph ? pw / ew : ph / eh;
+  const vw = ew * scale;  // 시각적 너비
+  const vh = eh * scale;  // 시각적 높이
+  // 90°/270° 회전 시 CSS width↔height가 시각적으로 뒤바뀌므로 교환
+  img.style.width     = (swapped ? vh : vw) + 'px';
+  img.style.height    = (swapped ? vw : vh) + 'px';
+  img.style.maxWidth  = 'none';
+  img.style.maxHeight = 'none';
+  img.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
+}
+
+function swapBoxImages(a, b) {
+  const ia = a.querySelector('img'), ib = b.querySelector('img');
+  const srcA = ia.src, rotA = +ia.dataset.rotation || 0, hasA = ia.style.display === 'block';
+  const srcB = ib.src, rotB = +ib.dataset.rotation || 0, hasB = ib.style.display === 'block';
+  if (hasA) showImage(b, srcA, rotA); else clearImage(b);
+  if (hasB) showImage(a, srcB, rotB); else clearImage(a);
+}
+
+function loadFile(box, file) {
+  const r = new FileReader();
+  r.onload = e => {
+    const src = e.target.result;
+    const tmp = new Image();
+    tmp.onload = () => {
+      const MAX = 1800;
+      const { naturalWidth: w, naturalHeight: h } = tmp;
+      if (w <= MAX && h <= MAX) { showImage(box, src); return; }
+      const scale = MAX / Math.max(w, h);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.getContext('2d').drawImage(tmp, 0, 0, canvas.width, canvas.height);
+      showImage(box, canvas.toDataURL('image/jpeg', 0.85));
+    };
+    tmp.src = src;
+  };
+  r.readAsDataURL(file);
+}
+
+/* ── Photo box factory ── */
+function makePhotoBox() {
+  const box = document.createElement('div');
+  box.className = 'photo-box';
+  box.tabIndex  = 0;
+  box.draggable = true;
+  box.innerHTML =
+    `<img alt="" data-rotation="0" draggable="false" />
+     <div class="photo-ph">클릭 또는 Ctrl+V로 붙여넣기<br>드래그로 업로드</div>
+     <div class="photo-ctl">
+       <button class="ctl-btn b-del" title="삭제">✕</button>
+       <button class="ctl-btn b-rep" title="교체">↺</button>
+       <button class="ctl-btn b-rot" title="회전">↻</button>
+     </div>`;
+
+  const img = box.querySelector('img');
+  const ctl = box.querySelector('.photo-ctl');
+
+  /* overlay: 삭제 */
+  ctl.querySelector('.b-del').addEventListener('click', e => {
+    e.stopPropagation(); clearImage(box);
+  });
+  /* overlay: 교체 */
+  ctl.querySelector('.b-rep').addEventListener('click', e => {
+    e.stopPropagation(); pickFiles(box);
+  });
+  /* overlay: 회전 */
+  ctl.querySelector('.b-rot').addEventListener('click', e => {
+    e.stopPropagation();
+    img.dataset.rotation = (parseInt(img.dataset.rotation || 0) + 90) % 360;
+    fitImage(box);
+  });
+
+  /* 빈 상태 클릭 → 파일 선택 */
+  box.addEventListener('click', e => {
+    if (e.target.closest('.photo-ctl')) return;
+    if (img.style.display === 'block') return;
+    pickFiles(box);
+  });
+
+  /* Ctrl+V 붙여넣기 */
+  box.addEventListener('paste', e => {
+    for (const item of e.clipboardData.items) {
+      if (item.type.startsWith('image/')) { loadFile(box, item.getAsFile()); break; }
+    }
+  });
+
+  /* 외부 파일 드롭 */
+  box.addEventListener('dragover', e => {
+    e.preventDefault();
+    box.classList.add('drag-over');
+  });
+  box.addEventListener('dragleave', e => {
+    if (!box.contains(e.relatedTarget)) box.classList.remove('drag-over');
+  });
+  box.addEventListener('drop', e => {
+    e.preventDefault();
+    box.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) {
+      const imgs = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      if (!imgs.length) return;
+      loadFile(box, imgs[0]);
+      const grid = box.closest('.photo-grid');
+      for (let i = 1; i < imgs.length; i++) {
+        const nb = makePhotoBox(); grid.appendChild(nb); loadFile(nb, imgs[i]);
+      }
+    } else if (dragSrc && dragSrc !== box) {
+      swapBoxImages(dragSrc, box);
+    }
+  });
+
+  /* 사진 순서 드래그 (이미지 있을 때만) */
+  box.addEventListener('dragstart', e => {
+    if (e.target.closest('.photo-ctl')) { e.preventDefault(); return; }
+    if (img.style.display !== 'block')  { e.preventDefault(); return; }
+    dragSrc = box;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', ''); /* Firefox 필수 */
+  });
+  box.addEventListener('dragend', () => { dragSrc = null; });
+
+  return box;
+}
+
+function pickFiles(targetBox) {
+  const grid  = targetBox.closest('.photo-grid');
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+  input.onchange = e => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    loadFile(targetBox, files[0]);
+    for (let i = 1; i < files.length; i++) {
+      const nb = makePhotoBox(); grid.appendChild(nb); loadFile(nb, files[i]);
+    }
+  };
+  input.click();
+}
+
+/* ── Layout preset ── */
+function setLayout(sheetWrap, type) {
+  const grid   = sheetWrap.querySelector('.photo-grid');
+  const boxes  = Array.from(grid.querySelectorAll('.photo-box'));
+  const target = parseInt(type);
+
+  grid.dataset.layout = type;
+
+  if (boxes.length < target) {
+    for (let i = boxes.length; i < target; i++) grid.appendChild(makePhotoBox());
+  } else if (boxes.length > target) {
+    const hasImg = boxes.filter(b => b.querySelector('img').style.display === 'block');
+    const empty  = boxes.filter(b => b.querySelector('img').style.display !== 'block');
+    const keep   = [...hasImg, ...empty].slice(0, target);
+    grid.innerHTML = '';
+    keep.forEach(b => grid.appendChild(b));
+    while (grid.querySelectorAll('.photo-box').length < target) grid.appendChild(makePhotoBox());
+  }
+
+  sheetWrap.querySelectorAll('.layout-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.layout === type)
+  );
+
+  requestAnimationFrame(() => {
+    grid.querySelectorAll('.photo-box').forEach(b => {
+      if (b.querySelector('img').style.display === 'block') fitImage(b);
+    });
+  });
+}
+
+/* ── Create sheet ── */
+function createSheet() {
+  sheetCount++;
+  const n    = sheetCount;
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap';
+  wrap.innerHTML =
+    `<div class="s-toolbar">
+       <span class="page-label">#${n}</span>
+       <button class="btn layout-btn active" data-layout="1">1칸</button>
+       <button class="btn layout-btn" data-layout="2">2칸</button>
+       <button class="btn layout-btn" data-layout="4">4칸</button>
+       <div class="spacer"></div>
+       <button class="btn btn-add-photo">+ 사진 추가</button>
+       <button class="btn danger btn-del-sheet">페이지 삭제</button>
+     </div>
+     <section class="sheet">
+       <header class="doc-header">
+         <div class="doc-title">물품사진대지</div>
+         <div class="meta-grid">
+           <div class="meta-cell"><span class="lbl">부서</span><div class="val" contenteditable data-key="dept"></div></div>
+           <div class="meta-cell"><span class="lbl">작성자</span><div class="val" contenteditable data-key="author"></div></div>
+           <div class="meta-cell"><span class="lbl">작성일</span><input class="val" type="date" /></div>
+           <div class="meta-cell"><span class="lbl">연락처</span><div class="val" contenteditable data-key="contact"></div></div>
+         </div>
+       </header>
+       <div class="sheet-body">
+         <div class="item-field">
+           <span class="lbl">품명</span>
+           <div class="val item-name" contenteditable></div>
+         </div>
+         <div class="photo-area">
+           <div class="photo-grid" data-layout="1"></div>
+         </div>
+       </div>
+     </section>`;
+
+  wrap.querySelector('input[type="date"]').value = todayStr;
+  wrap.querySelector('.photo-grid').appendChild(makePhotoBox());
+
+  wrap.querySelectorAll('.layout-btn').forEach(btn =>
+    btn.addEventListener('click', () => setLayout(wrap, btn.dataset.layout))
+  );
+
+  wrap.querySelector('.btn-add-photo').addEventListener('click', () => {
+    wrap.querySelector('.photo-grid').appendChild(makePhotoBox());
+  });
+
+  wrap.querySelector('.btn-del-sheet').addEventListener('click', () => {
+    if (document.querySelectorAll('.sheet-wrap').length <= 1) return;
+    wrap.remove();
+    renumberSheets();
+    refreshDelBtns();
+  });
+
+  initAutoSave(wrap);
+  wrap.querySelector('.item-name').addEventListener('input', updateDocTitle);
+
+  document.getElementById('sheetsContainer').appendChild(wrap);
+  refreshDelBtns();
+  return wrap;
+}
+
+function renumberSheets() {
+  document.querySelectorAll('.sheet-wrap').forEach((w, i) =>
+    w.querySelector('.page-label').textContent = `#${i + 1}`
+  );
+}
+
+function refreshDelBtns() {
+  const all = document.querySelectorAll('.sheet-wrap');
+  all.forEach(w => w.querySelector('.btn-del-sheet').disabled = all.length <= 1);
+}
+
+function updateDocTitle() {
+  const name = document.querySelector('.item-name')?.textContent.trim() || '';
+  document.title = name ? name + ' 사진대지' : '물품사진대지';
+}
+
+/* ── 전역 Ctrl+V (포커스가 없을 때 → 첫 빈 슬롯) ── */
+document.addEventListener('paste', e => {
+  if (document.activeElement?.closest('.photo-box')) return;
+  if (document.activeElement?.getAttribute('contenteditable')) return;
+  const emptyBox = Array.from(document.querySelectorAll('.photo-box'))
+    .find(b => b.querySelector('img').style.display !== 'block');
+  if (!emptyBox) return;
+  for (const item of e.clipboardData.items) {
+    if (item.type.startsWith('image/')) { loadFile(emptyBox, item.getAsFile()); break; }
+  }
+});
+
+/* ── 툴바 ── */
+document.getElementById('btnPDF').addEventListener('click', () => {
+  updateDocTitle(); window.print();
+});
+document.getElementById('btnAddSheet').addEventListener('click', () => {
+  const wrap = createSheet();
+  requestAnimationFrame(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+});
+
+/* init */
+createSheet();
+</script>
+</body>
+</html>
